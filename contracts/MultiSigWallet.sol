@@ -48,12 +48,12 @@ contract MultiSigWallet {
 
     /// @dev add new owner to have access, enables the ability to create more than one owner to manage the wallet
     function addOwner(address newOwner) isOwner public {
-      //YOUR CODE HERE
+      _owners[newOwner] = 1;
     }
 
     /// @dev remove suspicious owners
     function removeOwner(address existingOwner) isOwner public {
-      //YOUR CODE HERE
+      delete(_owners[existingOwner]);
     }
 
     /// @dev Fallback function, which accepts ether when sent to contract
@@ -61,10 +61,9 @@ contract MultiSigWallet {
         DepositFunds(msg.sender, msg.value);
     }
 
-    function withdraw(uint amount) public {
-      require(address(this).balance >= value);
-      //YOUR CODE HERE
-
+    function withdraw(uint amount) validOwner public {
+      require(address(this).balance >= amount);
+      msg.sender.send(amount);
     }
 
     /// @dev Send ether to specific a transaction
@@ -77,30 +76,29 @@ contract MultiSigWallet {
     /// note, keep transactionID updated
     function transferTo(address destination, uint value) validOwner public {
       require(address(this).balance >= value);
-      //YOUR CODE HERE
 
       //create the transaction
-      //YOUR CODE HERE
-
-
-
-
+      Transaction memory t;
+      t.source = msg.sender;
+      t.destination = destination;
+      t.value = value;
+      t.signatureCount = 0;
 
       //add transaction to the data structures
-      //YOUR CODE HERE
-
+      _transactions[_transactionIndex] = t;
 
       //log that the transaction was created to a specific address
-      //YOUR CODE HERE
+      TransactionCreated(t.source, t.destination, t.value, _transactionIndex);
+      _transactionIndex++;
     }
 
     //returns pending transcations
     function getPendingTransactions() constant validOwner public returns (uint[]) {
-      //YOUR CODE HERE
+      return _pendingTransactions;
     }
 
     /// @dev Allows an owner to confirm a transaction.
-    /// @param transactionId Transaction ID.
+    /// @param transactionID Transaction ID.
     /// Sign and Execute transaction.
     function signTransaction(uint transactionID) validOwner public {
       //Use Transaction Structure. Above in TransferTo function, because
@@ -110,37 +108,38 @@ contract MultiSigWallet {
       //object, and instead will reference it directly.
 
       //Create variable transaction using storage (which creates a reference point)
-      //YOUR CODE HERE
+      Transaction storage transaction;
 
       // Transaction must exist, note: use require(), but can't do require(transaction), .
-      //YOUR CODE HERE
+      require(_transactions[transactionID].value != 0);
 
       // Creator cannot sign the transaction, use require()
-      //YOUR CODE HERE
+      require(msg.sender != transaction.source);
 
       // Cannot sign a transaction more than once, use require()
-      //YOUR CODE HERE
+      require(transaction.signatures[msg.sender] == 0);
 
       // assign the transaction = 1, so that when the function is called again it will fail
-      //YOUR CODE HERE
+      transaction.signatures[msg.sender] = 1;
 
       // increment signatureCount
-      //YOUR CODE HERE
+      transaction.signatureCount += 1;
 
       // log transaction
-      //YOUR CODE HERE
+      TransactionSigned(msg.sender, transactionID);
 
       //  check to see if transaction has enough signatures so that it can actually be completed
       // if true, make the transaction. Don't forget to log the transaction was completed.
       if (transaction.signatureCount >= MIN_SIGNATURES) {
         require(address(this).balance >= transaction.value); //validate transaction
-        //YOUR CODE HERE
+        transaction.destination.send(transaction.value);
 
         //log that the transaction was complete
-        //YOUR CODE HERE
+        TransactionCompleted(transaction.source, transaction.destination,
+          transaction.value, transactionID);
 
         //end with a call to deleteTransaction
-        deleteTransaction(transactionId);
+        deleteTransaction(transactionID);
       }
     }
 
@@ -161,7 +160,7 @@ contract MultiSigWallet {
 
     /// @return Returns balance
     function walletBalance() constant public returns (uint) {
-      //YOUR CODE HERE
+      return address(this).balance;
     }
 
  }
